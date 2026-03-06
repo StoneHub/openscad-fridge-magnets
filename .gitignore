@@ -1,0 +1,10 @@
+# Generated STL exports — don't track binaries
+*.stl
+*.amf
+*.3mf
+
+# OpenSCAD cache
+*.csg
+
+# Claude project settings
+.claude/
