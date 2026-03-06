@@ -1,5 +1,8 @@
 // Fridge magnet letter tile — fits 100×100 mm build plate
-// Render:  openscad -q -D 'letter="A"' -o A.stl magnetic_letter_only.scad
+// Render one letter:
+//   openscad -q -D 'letter="M"' -o M.stl magnetic_letter_only.scad
+// Batch-render a word:
+//   for L in M O E; do openscad -q -D "letter=\"$L\"" -o "$L.stl" magnetic_letter_only.scad; done
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  SETTINGS — edit these, leave everything below alone            ║
@@ -9,27 +12,26 @@ letter    = "M";
 size      = 88;   // glyph height in mm (88 ≈ full 100×100 plate)
 thickness = 15;   // Z height of the tile
 
+// ── MODE — uncomment exactly one ─────────────────────────────────────────────
+mode = "smart";    // hardcoded per-letter positions for A–Z (best quality)
+// mode = "spiral";  // auto-spiral; only pockets that FULLY fit inside are kept
+// mode = "manual";  // use magnet_positions list below
+
 // ── Font ─────────────────────────────────────────────────────────────────────
-font_name = "Bahnschrift:style=Bold";      // DIN-style — built into Win10/11
+font_name = "Comic Sans MS:style=Bold";   // ← the MOE font
+// font_name = "Bahnschrift:style=Bold";
 // font_name = "Bahnschrift:style=Bold Condensed";
 // font_name = "Liberation Sans:style=Bold";
 // font_name = "Arial:style=Bold";
 // font_name = "Impact";
-// font_name = "Courier New:style=Bold";
-// font_name = "Comic Sans MS:style=Bold";
 // font_name = "Anton";                    // Google Font — narrow + punchy
 // font_name = "Oswald:style=Bold";        // Google Font — tall + slim
 
-// ── Magnet spec ───────────────────────────────────────────────────────────────
-magnet_d     = 6.2;  // pocket diameter  (slightly loose for 6 mm magnets)
+// ── Magnet spec ──────────────────────────────────────────────────────────────
+magnet_d     = 6.2;  // pocket diameter (slightly loose for 6 mm disc magnets)
 magnet_depth = 2.2;  // pocket depth
 
-// ── MODE — uncomment exactly one ─────────────────────────────────────────────
-mode = "smart";    // hardcoded per-letter positions for A–Z  (best quality)
-// mode = "spiral";  // auto-spiral from centre; only fully-inside pockets kept
-// mode = "manual";  // use magnet_positions list below
-
-// ── MANUAL positions (used when mode = "manual") ──────────────────────────────
+// ── MANUAL positions (used when mode = "manual") ─────────────────────────────
 // Origin [0,0] = visual centre of the glyph.
 magnet_positions = [
   [ 17,  15],
@@ -37,50 +39,51 @@ magnet_positions = [
   [-15,  15],
 ];
 
-// ── SPIRAL settings (used when mode = "spiral") ───────────────────────────────
-spiral_max    = 4;   // hard cap — magnets are expensive!
-spiral_spacing = 16; // mm between candidate ring steps
+// ── SPIRAL settings (used when mode = "spiral") ──────────────────────────────
+spiral_max     = 4;   // target pocket count (magnets are expensive!)
+spiral_spacing = 16;  // mm between candidate ring steps
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  PER-LETTER MAGNET POSITIONS  (mode = "smart")                  ║
-// ║  Tuned for Bahnschrift Bold at size = 88.                       ║
+// ║  Tuned for Comic Sans MS Bold at size = 88.                     ║
 // ║  Coords are mm from the visual centre of each glyph.            ║
+// ║  Safety-masked against the letter body so any position that      ║
+// ║  misses the stroke is silently dropped.                          ║
 // ╚══════════════════════════════════════════════════════════════════╝
 function letter_magnets(ch) =
-  ch == "A" ? [[-18, -22], [ 18, -22], [  0,  -8]             ] :
-  ch == "B" ? [[-22,  18], [-22, -15], [ 14,  20], [ 14,  -6] ] :
-  ch == "C" ? [[-28,   0], [  0,  25], [  0, -25]             ] :
-  ch == "D" ? [[-22,  18], [-22, -18], [ 18,   0]             ] :
-  ch == "E" ? [[-22,  22], [-22, -22], [  8,  25], [  8, -25] ] :
-  ch == "F" ? [[-22,  20], [-22,  -8], [  8,  25]             ] :
-  ch == "G" ? [[-28,   0], [  0,  25], [ 18,  -8]             ] :
-  ch == "H" ? [[-22,  15], [-22, -15], [ 22,  15], [ 22, -15] ] :
-  ch == "I" ? [[  0,  20], [  0, -20]                         ] :
-  ch == "J" ? [[ 14,  22], [ -2, -25]                         ] :
-  ch == "K" ? [[-22,  15], [-22, -15], [ 14,  24], [ 14, -24] ] :
-  ch == "L" ? [[-22,  18], [-22,  -8], [ 10, -28]             ] :
-  ch == "M" ? [[-28,  -5], [-10,  18], [ 10,  18], [ 28,  -5] ] :
-  ch == "N" ? [[-22,  15], [-22, -15], [ 22,  15], [ 22, -15] ] :
-  ch == "O" ? [[-28,   0], [ 28,   0], [  0,  25], [  0, -25] ] :
-  ch == "P" ? [[-22,  15], [-22, -20], [ 14,  18]             ] :
-  ch == "Q" ? [[-28,   0], [  0,  25], [ 22, -15]             ] :
-  ch == "R" ? [[-22,  15], [-22, -20], [ 14,  18], [ 15, -20] ] :
-  ch == "S" ? [[-10,  22], [ 10, -22]                         ] :
-  ch == "T" ? [[-24,  28], [ 24,  28], [  0, -10]             ] :
-  ch == "U" ? [[-22,  15], [ 22,  15], [  0, -25]             ] :
-  ch == "V" ? [[-20,  22], [ 20,  22]                         ] :
-  ch == "W" ? [[-28,   5], [-10, -18], [ 10, -18], [ 28,   5] ] :
-  ch == "X" ? [[-18,  24], [ 18,  24], [-18, -24], [ 18, -24] ] :
-  ch == "Y" ? [[-20,  22], [ 20,  22], [  0, -15]             ] :
-  ch == "Z" ? [[  8,  28], [  0,   0], [ -8, -28]             ] :
-  /* fallback — centre pocket */ [[0, 0]];
+  ch == "A" ? [[-20, -20], [ 20, -20], [  0,  -5]             ] :
+  ch == "B" ? [[-24,  18], [-24, -15], [ 14,  18], [ 14,  -8] ] :
+  ch == "C" ? [[-30,   0], [  0,  26], [  0, -26]             ] :
+  ch == "D" ? [[-24,  18], [-24, -18], [ 20,   0]             ] :
+  ch == "E" ? [[-24,  20], [-24, -20], [ 10,  24], [ 10, -24] ] :
+  ch == "F" ? [[-24,  20], [-24,  -8], [ 10,  26]             ] :
+  ch == "G" ? [[-30,   0], [  0,  26], [ 20,  -8]             ] :
+  ch == "H" ? [[-24,  15], [-24, -15], [ 24,  15], [ 24, -15] ] :
+  ch == "I" ? [[  0,  18], [  0, -18]                         ] :
+  ch == "J" ? [[ 16,  22], [  0, -24]                         ] :
+  ch == "K" ? [[-24,  15], [-24, -15], [ 14,  22], [ 14, -22] ] :
+  ch == "L" ? [[-24,  18], [-24,  -8], [ 12, -28]             ] :
+  ch == "M" ? [[-30,  -8], [ -8,  18], [  8,  18], [ 30,  -8] ] :
+  ch == "N" ? [[-24,  15], [-24, -15], [ 24,  15], [ 24, -15] ] :
+  ch == "O" ? [[-28,   0], [ 28,   0], [  0,  24], [  0, -24] ] :
+  ch == "P" ? [[-24,  15], [-24, -20], [ 16,  18]             ] :
+  ch == "Q" ? [[-28,   0], [  0,  24], [ 24, -15]             ] :
+  ch == "R" ? [[-24,  15], [-24, -20], [ 16,  18], [ 16, -20] ] :
+  ch == "S" ? [[-12,  20], [ 12, -20]                         ] :
+  ch == "T" ? [[-26,  28], [ 26,  28], [  0, -10]             ] :
+  ch == "U" ? [[-24,  15], [ 24,  15], [  0, -26]             ] :
+  ch == "V" ? [[-22,  22], [ 22,  22]                         ] :
+  ch == "W" ? [[-30,   5], [-10, -18], [ 10, -18], [ 30,   5] ] :
+  ch == "X" ? [[-18,  22], [ 18,  22], [-18, -22], [ 18, -22] ] :
+  ch == "Y" ? [[-22,  22], [ 22,  22], [  0, -16]             ] :
+  ch == "Z" ? [[ 10,  28], [  0,   0], [-10, -28]             ] :
+  /* fallback */ [[0, 0]];
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  INTERNALS — nothing to edit below here                         ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
-// Spiral candidate list — rings expand outward so the cap always grabs
-// the most central (highest-quality) positions first.
+// Spiral candidate generator — rings expand outward from [0,0].
 function _ring(r, sp) =
   r == 0 ? [[0, 0]]
          : [for (a = [0 : 360 / (r * 6) : 359.9])
@@ -91,58 +94,64 @@ function _spiral_pts(sp, rings) =
 
 _candidates = _spiral_pts(spiral_spacing, 4);  // ~60 candidates, inner-first
 
-// ── Geometry modules ─────────────────────────────────────────────────────────
+// ── Shared helpers ───────────────────────────────────────────────────────────
+
+// 2D letter glyph — used for masking and extrusion
+module _letter_2d() {
+  text(letter, size = size, font = font_name,
+       halign = "center", valign = "center");
+}
+
+// 2D letter eroded inward by magnet radius + margin.
+// Any centre-point inside this shape → the full magnet disc fits in the letter.
+module _eroded_2d() {
+  offset(r = -(magnet_d / 2 + 0.3))
+    _letter_2d();
+}
 
 module letter_body() {
   linear_extrude(height = thickness)
-    text(letter, size = size, font = font_name,
-         halign = "center", valign = "center");
+    _letter_2d();
 }
 
-// SMART pockets — straight cylinders at the hardcoded positions
+// ── Pocket modules ───────────────────────────────────────────────────────────
+
+// SMART — hardcoded positions, masked against the letter body so any position
+// that misses the stroke (e.g. after changing font/size) is silently dropped.
 module smart_pockets() {
-  for (p = letter_magnets(letter))
-    translate([p[0], p[1], 0])
-      cylinder(h = magnet_depth, d = magnet_d, $fn = 64);
+  intersection() {
+    linear_extrude(height = magnet_depth)
+      _letter_2d();
+    union()
+      for (p = letter_magnets(letter))
+        translate([p[0], p[1], 0])
+          cylinder(h = magnet_depth, d = magnet_d, $fn = 64);
+  }
 }
 
-// SPIRAL pockets — morphological erosion filter guarantees every pocket
-// that survives COMPLETELY fits inside the letter stroke:
-//
-//   1. Erode letter inward by (magnet_d/2 + margin) using offset().
-//      Any centre-point inside the eroded shape is ≥ magnet_d/2 from
-//      the letter boundary → the full magnet circle fits.
-//   2. Intersect tiny pin-point markers at each spiral candidate with
-//      the eroded shape.  Pins outside the eroded zone are clipped away.
-//   3. Minkowski-expand the surviving pins by one magnet cylinder →
-//      full circular pockets only at geometrically valid positions.
-//
+// SPIRAL — tests many candidates (not just spiral_max), lets the erosion
+// filter kill ones that don't fully fit.  The spiral ordering means the most
+// central valid positions survive first.  spiral_max is advisory — the actual
+// count depends on letter geometry, but for most letters at this size it
+// naturally lands near the target.
 module spiral_pockets() {
-  n      = min(spiral_max, len(_candidates));
-  margin = 0.3;  // extra inset safety margin, mm
-  for (i = [0 : n - 1]) {
+  test_count = min(spiral_max * 5, len(_candidates));  // generous test window
+  for (i = [0 : test_count - 1]) {
     cx = _candidates[i][0];
     cy = _candidates[i][1];
-    // Process each candidate independently so disconnected survivors
-    // don't interfere with each other inside minkowski().
     minkowski() {
       intersection() {
-        // Eroded letter mask (very thin slab — just needs to clip the pin)
         linear_extrude(height = 0.02)
-          offset(r = -(magnet_d / 2 + margin))
-            text(letter, size = size, font = font_name,
-                 halign = "center", valign = "center");
-        // Tiny pin at this candidate position
+          _eroded_2d();
         translate([cx, cy, 0])
           cylinder(h = 0.02, r = 0.01, $fn = 4);
       }
-      // Expand surviving pin → full magnet pocket
       cylinder(h = magnet_depth, d = magnet_d, $fn = 64);
     }
   }
 }
 
-// MANUAL pockets
+// MANUAL — raw positions, no masking.
 module manual_pockets() {
   for (p = magnet_positions)
     translate([p[0], p[1], 0])
@@ -150,6 +159,10 @@ module manual_pockets() {
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
+
+echo(str("letter = \"", letter, "\"  mode = ", mode,
+         "  font = ", font_name));
+
 difference() {
   letter_body();
   if      (mode == "smart")  smart_pockets();
