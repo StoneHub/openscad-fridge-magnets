@@ -3,6 +3,11 @@
 //   openscad -q -D 'letter="M"' -o M.stl magnetic_letter_only.scad
 // Batch-render a word:
 //   for L in M O E; do openscad -q -D "letter=\"$L\"" -o "$L.stl" magnetic_letter_only.scad; done
+//
+// Slicer tips for faster prints:
+//   - 0.28 mm layer height (or 0.3 if your nozzle allows)
+//   - 10–15 % infill (gyroid or grid) — or enable hollow below
+//   - 3 perimeters is plenty for strength
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  SETTINGS — edit these, leave everything below alone            ║
@@ -26,6 +31,18 @@ font_name = "Comic Sans MS:style=Bold";   // ← the MOE font
 // font_name = "Impact";
 // font_name = "Anton";                    // Google Font — narrow + punchy
 // font_name = "Oswald:style=Bold";        // Google Font — tall + slim
+
+// ── Fillet ───────────────────────────────────────────────────────────────────
+// Rounded top edge — makes the face side feel nice.  Bottom stays flat for
+// bed adhesion and magnet pockets.  Set to 0 to disable.
+fillet_r     = 2;    // radius of the quarter-round (mm)
+fillet_steps = 10;   // curve smoothness (more = smoother but slower render)
+
+// ── Hollow interior ──────────────────────────────────────────────────────────
+// Shells the inside to save material and print time.  Solid floor covers
+// the magnet pockets; solid ceiling protects the top face and fillet zone.
+hollow = true;
+wall   = 3;          // shell wall / floor / ceiling thickness (mm)
 
 // ── Magnet spec ──────────────────────────────────────────────────────────────
 magnet_d     = 6.2;  // pocket diameter (slightly loose for 6 mm disc magnets)
@@ -63,7 +80,7 @@ function letter_magnets(ch) =
   ch == "J" ? [[ 16,  22], [  0, -24]                         ] :
   ch == "K" ? [[-24,  15], [-24, -15], [ 14,  22], [ 14, -22] ] :
   ch == "L" ? [[-24,  18], [-24,  -8], [ 12, -28]             ] :
-  ch == "M" ? [[-30,  -8], [ -8,  18], [  8,  18], [ 30,  -8] ] :
+  ch == "M" ? [[-30,   0], [ -8,   0], [  9,   0], [ 30,   0] ] :
   ch == "N" ? [[-24,  15], [-24, -15], [ 24,  15], [ 24, -15] ] :
   ch == "O" ? [[-28,   0], [ 28,   0], [  0,  24], [  0, -24] ] :
   ch == "P" ? [[-24,  15], [-24, -20], [ 16,  18]             ] :
@@ -83,6 +100,9 @@ function letter_magnets(ch) =
 // ║  INTERNALS — nothing to edit below here                         ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
+// Adaptive quality: fast in preview (F5), full detail in render (F6)
+_fn = $preview ? 24 : 64;
+
 // Spiral candidate generator — rings expand outward from [0,0].
 function _ring(r, sp) =
   r == 0 ? [[0, 0]]
@@ -96,28 +116,72 @@ _candidates = _spiral_pts(spiral_spacing, 4);  // ~60 candidates, inner-first
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
 
-// 2D letter glyph — used for masking and extrusion
+// 2D letter glyph — single source of truth for the shape
 module _letter_2d() {
   text(letter, size = size, font = font_name,
        halign = "center", valign = "center");
 }
 
 // 2D letter eroded inward by magnet radius + margin.
-// Any centre-point inside this shape → the full magnet disc fits in the letter.
 module _eroded_2d() {
   offset(r = -(magnet_d / 2 + 0.3))
     _letter_2d();
 }
 
+// ── Letter body with optional fillet ─────────────────────────────────────────
+
 module letter_body() {
-  linear_extrude(height = thickness)
-    _letter_2d();
+  if (fillet_r > 0) {
+    // Flat-sided main body up to the fillet zone
+    linear_extrude(height = thickness - fillet_r)
+      _letter_2d();
+
+    // Quarter-circle rolloff at the top edge.
+    // Each step hulls two thin slices at slightly different offsets/heights,
+    // tracing a smooth arc that rounds the edge.
+    for (i = [0 : fillet_steps - 1]) {
+      t0 = i       / fillet_steps;
+      t1 = (i + 1) / fillet_steps;
+      // Quarter-circle parameterisation
+      inset0 = fillet_r * (1 - cos(t0 * 90));
+      inset1 = fillet_r * (1 - cos(t1 * 90));
+      z0 = thickness - fillet_r + fillet_r * sin(t0 * 90);
+      z1 = thickness - fillet_r + fillet_r * sin(t1 * 90);
+      hull() {
+        translate([0, 0, z0])
+          linear_extrude(height = 0.01)
+            offset(r = -inset0) _letter_2d();
+        translate([0, 0, z1])
+          linear_extrude(height = 0.01)
+            offset(r = -inset1) _letter_2d();
+      }
+    }
+  } else {
+    // No fillet — simple extrude
+    linear_extrude(height = thickness)
+      _letter_2d();
+  }
+}
+
+// ── Hollow interior ──────────────────────────────────────────────────────────
+
+module _hollow_void() {
+  if (hollow) {
+    floor_h = max(magnet_depth + 1.0, wall);   // solid floor covers pockets
+    ceil_h  = max(wall, fillet_r + 1);          // solid ceiling under fillet
+    void_h  = thickness - floor_h - ceil_h;
+    if (void_h > 1) {                           // only hollow if there's room
+      translate([0, 0, floor_h])
+        linear_extrude(height = void_h)
+          offset(r = -wall)
+            _letter_2d();
+    }
+  }
 }
 
 // ── Pocket modules ───────────────────────────────────────────────────────────
 
-// SMART — hardcoded positions, masked against the letter body so any position
-// that misses the stroke (e.g. after changing font/size) is silently dropped.
+// SMART — hardcoded positions, masked against the letter body.
 module smart_pockets() {
   intersection() {
     linear_extrude(height = magnet_depth)
@@ -125,17 +189,13 @@ module smart_pockets() {
     union()
       for (p = letter_magnets(letter))
         translate([p[0], p[1], 0])
-          cylinder(h = magnet_depth, d = magnet_d, $fn = 64);
+          cylinder(h = magnet_depth, d = magnet_d, $fn = _fn);
   }
 }
 
-// SPIRAL — tests many candidates (not just spiral_max), lets the erosion
-// filter kill ones that don't fully fit.  The spiral ordering means the most
-// central valid positions survive first.  spiral_max is advisory — the actual
-// count depends on letter geometry, but for most letters at this size it
-// naturally lands near the target.
+// SPIRAL — morphological erosion guarantees every surviving pocket fully fits.
 module spiral_pockets() {
-  test_count = min(spiral_max * 5, len(_candidates));  // generous test window
+  test_count = min(spiral_max * 5, len(_candidates));
   for (i = [0 : test_count - 1]) {
     cx = _candidates[i][0];
     cy = _candidates[i][1];
@@ -146,7 +206,7 @@ module spiral_pockets() {
         translate([cx, cy, 0])
           cylinder(h = 0.02, r = 0.01, $fn = 4);
       }
-      cylinder(h = magnet_depth, d = magnet_d, $fn = 64);
+      cylinder(h = magnet_depth, d = magnet_d, $fn = _fn);
     }
   }
 }
@@ -155,17 +215,20 @@ module spiral_pockets() {
 module manual_pockets() {
   for (p = magnet_positions)
     translate([p[0], p[1], 0])
-      cylinder(h = magnet_depth, d = magnet_d, $fn = 64);
+      cylinder(h = magnet_depth, d = magnet_d, $fn = _fn);
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
-echo(str("letter = \"", letter, "\"  mode = ", mode,
-         "  font = ", font_name));
+echo(str("letter=\"", letter, "\"  mode=", mode,
+         "  font=", font_name,
+         "  fillet=", fillet_r, "mm",
+         "  hollow=", hollow ? str("yes (", wall, "mm wall)") : "no"));
 
 difference() {
   letter_body();
   if      (mode == "smart")  smart_pockets();
   else if (mode == "spiral") spiral_pockets();
   else                       manual_pockets();
+  _hollow_void();
 }
