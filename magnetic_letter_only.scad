@@ -38,12 +38,6 @@ font_name = "Comic Sans MS:style=Bold";   // ← the MOE font
 fillet_r     = 2;    // radius of the quarter-round (mm)
 fillet_steps = 10;   // curve smoothness (more = smoother but slower render)
 
-// ── Hollow interior ──────────────────────────────────────────────────────────
-// Shells the inside to save material and print time.  Solid floor covers
-// the magnet pockets; solid ceiling protects the top face and fillet zone.
-hollow = true;
-wall   = 3;          // shell wall / floor / ceiling thickness (mm)
-
 // ── Magnet spec ──────────────────────────────────────────────────────────────
 magnet_d     = 6.2;  // pocket diameter (slightly loose for 6 mm disc magnets)
 magnet_depth = 2.2;  // pocket depth
@@ -163,22 +157,6 @@ module letter_body() {
   }
 }
 
-// ── Hollow interior ──────────────────────────────────────────────────────────
-
-module _hollow_void() {
-  if (hollow) {
-    floor_h = max(magnet_depth + 1.0, wall);   // solid floor covers pockets
-    ceil_h  = max(wall, fillet_r + 1);          // solid ceiling under fillet
-    void_h  = thickness - floor_h - ceil_h;
-    if (void_h > 1) {                           // only hollow if there's room
-      translate([0, 0, floor_h])
-        linear_extrude(height = void_h)
-          offset(r = -wall)
-            _letter_2d();
-    }
-  }
-}
-
 // ── Pocket modules ───────────────────────────────────────────────────────────
 
 // SMART — hardcoded positions, masked against the letter body.
@@ -222,13 +200,11 @@ module manual_pockets() {
 
 echo(str("letter=\"", letter, "\"  mode=", mode,
          "  font=", font_name,
-         "  fillet=", fillet_r, "mm",
-         "  hollow=", hollow ? str("yes (", wall, "mm wall)") : "no"));
+         "  fillet=", fillet_r, "mm"));
 
 difference() {
   letter_body();
   if      (mode == "smart")  smart_pockets();
   else if (mode == "spiral") spiral_pockets();
   else                       manual_pockets();
-  _hollow_void();
 }
